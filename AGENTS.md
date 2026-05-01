@@ -31,42 +31,46 @@ zero-to-agent/
 ├── crates/               # Rust crates (Cargo workspace members)
 ├── packages/             # Shared TS packages (only if reused across 2+ apps)
 ├── Cargo.toml            # Rust workspace manifest
-├── pnpm-workspace.yaml   # pnpm workspace manifest
-├── package.json          # Root scripts + packageManager pin
+├── package.json          # Root scripts + Bun workspaces config
+├── bun.lock              # Bun lockfile (committed)
 └── AGENTS.md             # This file
 ```
 
 ## Toolchain
 
-- **Node:** 20+ (tested on 25). Pin via `engines` in root `package.json`.
-- **Package manager:** `pnpm` (10.x). Installed at `~/.npm-global/bin/pnpm`. If `pnpm` is not on
-  PATH, run `export PATH="$HOME/.npm-global/bin:$PATH"`.
+- **JS runtime + package manager:** [Bun](https://bun.sh) 1.3+. Bun is *both* the runtime
+  (Next.js dev/build/start use `bun --bun next ...`) and the workspace manager. No npm, pnpm,
+  yarn, or Node-runtime alternatives.
 - **Rust:** stable, via Homebrew (`cargo`, `rustc`). Workspace-pinned dependencies live in
   `[workspace.dependencies]` of the root `Cargo.toml`.
 - **Bundler:** Turbopack (Next.js default). Webpack only as fallback if a library forces it.
+- **Lockfile:** `bun.lock` (text format). Committed. Do not delete or hand-edit.
 
 ## Common commands
 
 Run from the repo root:
 
-| Goal                         | Command                                          |
-|------------------------------|--------------------------------------------------|
-| Install all JS deps          | `pnpm install`                                   |
-| Run the explorer dev server  | `pnpm dev` (alias for `--filter nextjs-explorer dev`) |
-| Build all JS apps            | `pnpm build`                                     |
-| Lint all JS apps             | `pnpm lint`                                      |
-| Add a dep to a specific app  | `pnpm --filter <app-name> add <pkg>`             |
-| Build all Rust crates        | `cargo build --workspace`                        |
-| Test all Rust crates         | `cargo test --workspace`                         |
+| Goal                         | Command                                       |
+|------------------------------|-----------------------------------------------|
+| Install all JS deps          | `bun install`                                 |
+| Run the explorer dev server  | `bun run dev`                                 |
+| Build all JS apps            | `bun run build`                               |
+| Lint all JS apps             | `bun run lint`                                |
+| Add a dep to a specific app  | `bun add <pkg> --cwd apps/<app-name>`         |
+| Run a script in one workspace| `bun --filter <app-name> <script>`            |
+| Build all Rust crates        | `cargo build --workspace`                     |
+| Test all Rust crates         | `cargo test --workspace`                      |
 
 ## Conventions
 
 ### Adding a new app
-1. `cd apps && pnpm create next-app@latest <name> --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --turbopack --use-pnpm --yes`
-2. Delete the generated `pnpm-workspace.yaml`, `AGENTS.md`, `CLAUDE.md`, `node_modules`,
+1. `cd apps && bun create next ./<name> --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --turbopack --yes`
+2. Delete any generated `AGENTS.md`, `CLAUDE.md`, `node_modules`, `package-lock.json`,
    `pnpm-lock.yaml`, and `README.md` from the new app — the root owns those.
-3. Run `pnpm install` from the repo root to register the workspace.
-4. Apply the editorial baseline: copy `globals.css` and `layout.tsx` from `nextjs-explorer` as a
+3. Edit the new app's `package.json` `scripts` so `dev`/`build`/`start` use the Bun runtime:
+   `bun --bun next dev`, `bun --bun next build`, `bun --bun next start`.
+4. Run `bun install` from the repo root to register the workspace.
+5. Apply the editorial baseline: copy `globals.css` and `layout.tsx` from `nextjs-explorer` as a
    starting point, or invoke `impeccable:craft`.
 
 ### Adding a new Rust crate
@@ -97,7 +101,7 @@ and called over HTTP. Do not couple Rust binaries to the Vercel build.
 
 ## Things that should *not* end up in this repo
 
-- A second JS package manager (no `npm install` or `yarn` — pnpm only).
+- A second JS package manager or runtime (no `npm install`, `yarn`, `pnpm` — Bun only).
 - Backend code in JS/TS (other than Server Actions / Route Handlers in Next.js apps).
 - Component libraries pulled in for one component (vendor or write the component).
 - AGENTS.md or CLAUDE.md files inside individual apps (the root is the single source of truth).

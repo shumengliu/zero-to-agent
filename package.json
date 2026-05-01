@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "description": "Hackathon monorepo: Rust backend + Next.js frontend.",
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "pnpm --filter nextjs-explorer dev",
-    "build": "pnpm -r build",
-    "lint": "pnpm -r lint"
+    "dev": "bun --filter nextjs-explorer dev",
+    "build": "bun --filter '*' build",
+    "lint": "bun --filter '*' lint"
   },
-  "packageManager": "pnpm@10.33.2",
   "engines": {
-    "node": ">=20"
+    "bun": ">=1.3"
   }
 }

@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-.pnpm-store/
 
 # Build outputs
 .next/
@@ -31,7 +30,6 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
-pnpm-debug.log*
 
 # Vercel
 .vercel

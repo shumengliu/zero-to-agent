@@ -7,8 +7,8 @@ See [`AGENTS.md`](./AGENTS.md) for the operating manual.
 ## Quickstart
 
 ```bash
-pnpm install
-pnpm dev   # runs apps/nextjs-explorer
+bun install
+bun run dev   # runs apps/nextjs-explorer on the Bun runtime
 ```
 
 Open http://localhost:3000.
@@ -19,6 +19,7 @@ Open http://localhost:3000.
 
 ## Stack
 
+- Runtime + package manager: Bun 1.3+
 - Frontend: TypeScript + React 19 + Next.js 16 (App Router, Turbopack)
 - Backend: Rust (Cargo workspace under `crates/`)
 - Styling: Tailwind 4 + the `impeccable` design skill suite
