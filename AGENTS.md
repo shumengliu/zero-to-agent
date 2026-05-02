@@ -7,42 +7,60 @@ Operating manual for AI agents and humans working in this repository.
 This is a hackathon monorepo. The bias is toward **simple, direct, demoable** choices over architectural purity.
 Decisions made for this reason are not technical debt — they are scope.
 
+## Judging format (Zero-to-Agent London)
+
+Two-stage judging:
+
+1. **Initial cut — repo + deployed URL.** Judges browse the GitHub repo and click the live URL.
+   README must hero-pitch in 30 seconds; deployed URL must work first-click.
+2. **Top 6 → live demo on stage.** The top 6 entries demo live; **3 winners are picked from
+   that 6**. To win, the live demo has to land — repo polish gets you to top 6, stage performance
+   picks the winner.
+
+All three sponsors (Vercel, Bright Data, Mubit) judge a single combined track, so projects that
+use all three meaningfully are strictly stronger than projects that use one deeply.
+
+Implication for engineering decisions: optimize for **(a)** a deployed URL that works first-click
+every time, and **(b)** a 60–90 second demo path that visibly exercises all three sponsor tools.
+Hidden cleverness that doesn't show on stage is wasted effort right now.
+
 ## Hard rules
 
 These are non-negotiable:
 
-1. **Backend language: Rust only.** Any service, daemon, CLI, or worker on the backend goes in
-   a Rust crate under `crates/`. No Python, Go, Node servers.
-2. **Frontend language: TypeScript + React + the latest Next.js, only.** No Vue, Svelte, plain JS,
-   or alternative React metaframeworks. Apps live in `apps/<name>/`.
-3. **Frontend styling: use the `impeccable` skill suite.** When building or editing UI, invoke the
+1. **TypeScript everywhere.** Frontend and backend. React + the latest Next.js for apps; Server
+   Actions, Route Handlers, and Vercel Functions for server logic. No Rust, Go, Python, or other
+   backend languages. No Vue, Svelte, plain JS, or alternative React metaframeworks. Apps live
+   in `apps/<name>/`.
+2. **Frontend styling: use the `impeccable` skill suite.** When building or editing UI, invoke the
    relevant `impeccable:*` skill (`craft`, `polish`, `typeset`, `layout`, `delight`, etc.). Default
    aesthetic is editorial dark — see `apps/nextjs-explorer` for the established baseline (Geist sans,
    Instrument Serif italic accents, dark zinc surfaces, subtle grain, gradient warm/cool wash).
-4. **Hackathon priority: ship over polish-the-edges.** When stuck between a clever abstraction and
+3. **Hackathon priority: ship over polish-the-edges.** When stuck between a clever abstraction and
    three duplicated lines, choose the duplication. Premature DRY is rejected.
 
 ## Repository layout
 
 ```
 zero-to-agent/
-├── apps/                 # Next.js apps (one per demo)
-│   └── nextjs-explorer/  # App #1: visual tour of the Next.js codebase
-├── crates/               # Rust crates (Cargo workspace members)
+├── apps/                 # Next.js apps
+│   ├── rentry/           # ★ Hackathon entry — agent that finds, drafts, and applies to London rentals (port 3002)
+│   ├── nextjs-explorer/  # Earlier experiment — visual tour of the Next.js codebase (port 3000)
+│   └── productify/       # Abandoned — GitHub URL → v0 product. Kept for reference, do not extend (port 3001)
 ├── packages/             # Shared TS packages (only if reused across 2+ apps)
-├── Cargo.toml            # Rust workspace manifest
+├── docs/                 # Internal docs (monorepo setup, conventions, etc.)
+│   └── monorepo.md       # Setup + stack reference (was the old root README)
 ├── package.json          # Root scripts + Bun workspaces config
 ├── bun.lock              # Bun lockfile (committed)
+├── README.md             # Judge-facing pitch (kept lean — internal docs go in docs/)
 └── AGENTS.md             # This file
 ```
 
 ## Toolchain
 
-- **JS runtime + package manager:** [Bun](https://bun.sh) 1.3+. Bun is *both* the runtime
+- **Runtime + package manager:** [Bun](https://bun.sh) 1.3+. Bun is *both* the runtime
   (Next.js dev/build/start use `bun --bun next ...`) and the workspace manager. No npm, pnpm,
   yarn, or Node-runtime alternatives.
-- **Rust:** stable, via Homebrew (`cargo`, `rustc`). Workspace-pinned dependencies live in
-  `[workspace.dependencies]` of the root `Cargo.toml`.
 - **Bundler:** Turbopack (Next.js default). Webpack only as fallback if a library forces it.
 - **Lockfile:** `bun.lock` (text format). Committed. Do not delete or hand-edit.
 
@@ -52,14 +70,16 @@ Run from the repo root:
 
 | Goal                         | Command                                       |
 |------------------------------|-----------------------------------------------|
-| Install all JS deps          | `bun install`                                 |
-| Run the explorer dev server  | `bun run dev`                                 |
-| Build all JS apps            | `bun run build`                               |
-| Lint all JS apps             | `bun run lint`                                |
+| Install all deps             | `bun install`                                 |
+| Run nextjs-explorer (3000)   | `bun run dev`                                 |
+| Run productify (3001)        | `bun run dev:productify`                      |
+| Run rentry (3002)            | `bun run dev:rentry`                          |
+| Build all apps               | `bun run build`                               |
+| Lint all apps                | `bun run lint`                                |
 | Add a dep to a specific app  | `bun add <pkg> --cwd apps/<app-name>`         |
 | Run a script in one workspace| `bun --filter <app-name> <script>`            |
-| Build all Rust crates        | `cargo build --workspace`                     |
-| Test all Rust crates         | `cargo test --workspace`                      |
+
+Each app pins a distinct port so multiple dev servers can run side-by-side.
 
 ## Conventions
 
@@ -73,43 +93,71 @@ Run from the repo root:
 5. Apply the editorial baseline: copy `globals.css` and `layout.tsx` from `nextjs-explorer` as a
    starting point, or invoke `impeccable:craft`.
 
-### Adding a new Rust crate
-1. `cd crates && cargo new <name> --lib` (or `--bin` for executables).
-2. Add common deps via `<dep>.workspace = true` referencing the root `[workspace.dependencies]`.
-3. The crate is auto-discovered by the `members = ["crates/*"]` glob.
-
 ### Server boundaries
-If a Next.js app needs server logic that crosses the trivial threshold (anything beyond
-straightforward Server Actions / Route Handlers — e.g. heavy compute, persistent state,
-long-running jobs), put it in a Rust crate and call it via HTTP from a Route Handler. **Do not**
-introduce a Node backend.
+Server logic lives inside Next.js apps as Server Actions, Route Handlers, or Vercel Functions.
+For heavy compute, long-running jobs, or persistent state, prefer Vercel Workflow or a Vercel
+Function with appropriate runtime config — still TypeScript. Do not introduce a separate
+backend in another language.
 
 ## Apps
 
-### `nextjs-explorer`
-Visual field guide to the Next.js codebase, rendered as live Mermaid diagrams. Six sections:
-repo layout, internals of `packages/next`, request lifecycle, build pipeline, App Router
-rendering, caching architecture. Mermaid is loaded client-side and themed to match the dark
-editorial surface. Diagram source lives in `src/lib/diagrams.ts` — edit there to add or change a
-diagram, and the rest of the page picks it up.
+### `rentry` (port 3002) — hackathon entry, 100% of effort goes here
+Conversational rental-search agent for London. The product organically uses all three sponsor
+tools, which is the strategic core of the submission:
+
+- **Vercel** — hosting, Postgres, AI workflow / Server Actions, per-user persistence keyed off
+  the auth screen (same username = same agent state across sessions).
+- **Bright Data** — live property listings fetched on demand for the user's stated criteria.
+- **Mubit** — long-term memory of the user's preferences, sharpening results across sessions.
+
+Demo flow (this is the canonical happy path — every code decision should make this flow
+unbreakable on stage):
+
+1. **Auth screen.** Username gate — purpose is to demo Vercel-side persistence + Mubit recall
+   ("log in with the same name later, your prefs come back").
+2. **Prompt entry.** Free-form criteria, e.g. *"I want to live in Aldgate East, Waterloo, or
+   near KCL. Budget ~£2000 pcm. Easy commute to Camden."*
+3. **Bright Data fetch.** Agent pulls live listings matching the area / budget constraints.
+4. **Ranked results with explainable fit.** Each property card surfaces green-checkmark reasons
+   the agent thinks it's a good fit (specific commute time, budget headroom, distance to named
+   landmarks, matched preferences from Mubit).
+
+This is the only app that should receive new feature work, polish, or design attention.
+
+### `nextjs-explorer` (port 3000) — earlier experiment, frozen
+Visual field guide to the Next.js codebase, rendered as live Mermaid diagrams. Mermaid is loaded
+client-side and themed to match the dark editorial surface. Diagram source lives in
+`src/lib/diagrams.ts`. Useful as a styling baseline for `rentry` (Geist sans, Instrument Serif
+italic accents, dark zinc surfaces, grain, gradient warm/cool wash). Don't extend it.
+
+### `productify` (port 3001) — abandoned
+GitHub-URL-to-v0-product agent. Submission was dropped in favour of `rentry`. The code stays in
+the repo for reference but **do not add features, polish, or fix bugs here** unless the user
+explicitly asks. If a shared utility from this app is genuinely useful to `rentry`, copy it
+across rather than introducing a cross-app dependency.
 
 ## Deployment
 
-Default target is Vercel (Fluid Compute, Node 24 LTS). Rust crates that need to be reachable from
-the frontend should be deployed separately (Vercel Sandbox, Fly.io, or a containerized service)
-and called over HTTP. Do not couple Rust binaries to the Vercel build.
+Default target is Vercel (Fluid Compute, Node 24 LTS). Everything ships through the standard
+`next build` pipeline — no separate backend services to deploy.
+
+## README vs docs/
+
+The root `README.md` is **judge-facing** — keep it short, hooky, and demo-oriented (problem,
+what we built, demo link, screenshot, stack, team). Setup/conventions/internal references live
+under `docs/`. Don't bloat the root README with toolchain trivia; link into `docs/monorepo.md`
+or `AGENTS.md` instead.
 
 ## Things that should *not* end up in this repo
 
-- A second JS package manager or runtime (no `npm install`, `yarn`, `pnpm` — Bun only).
-- Backend code in JS/TS (other than Server Actions / Route Handlers in Next.js apps).
+- A second package manager or runtime (no `npm install`, `yarn`, `pnpm` — Bun only).
+- Backend services in Rust, Go, Python, or anything else — TypeScript only, inside Next.js.
 - Component libraries pulled in for one component (vendor or write the component).
 - AGENTS.md or CLAUDE.md files inside individual apps (the root is the single source of truth).
 
 ## Working with this repo as an agent
 
-- Keep changes scoped to one app or one crate per task unless the user explicitly asks for
-  cross-cutting work.
+- Keep changes scoped to one app per task unless the user explicitly asks for cross-cutting work.
 - When editing UI, screenshot the result with headless Chrome (`/Applications/Google
   Chrome.app/Contents/MacOS/Google Chrome --headless --screenshot=...`) and verify visually
   before declaring done.

@@ -1,97 +1,104 @@
-# Productify
+# Rentry
 
-**Paste a GitHub repo URL. An agent investigates it, picks the right kind of interactive web product, and ships it on v0.**
+**An agent that finds you a flat in London the way a friend with insider knowledge would.**
 
-Submission for [Zero to Agent](https://oscarama.notion.site/Zero-to-Agent-London-Information-Public-352f4900574780849517e736e27499b9), London.
+Submission for [Zero to Agent](https://oscarama.notion.site/Zero-to-Agent-London-Information-Public-352f4900574780849517e736e27499b9), London — combined Vercel × Bright Data × Mubit track.
 
-> **Live demo:** **[productify-delta.vercel.app](https://productify-delta.vercel.app)**
+> **Live demo:** **[rentry-zero-to-agent.vercel.app](https://rentry-zero-to-agent.vercel.app)**
 >
-> **To try it yourself:** Paste your v0 API key + any GitHub repo. Watch the agent work in real time.
+> **Try it:** Pick any username → describe what you want in plain English → watch the agent reason through live listings.
+> Log in again later as the same name and your preferences come back with you.
 
 ---
 
-## What makes this an agent
+## The 30-second pitch
 
-It's not a one-shot prompt. The repo investigation runs as a tool-using loop on **Vercel AI Gateway** (Claude Sonnet 4.5):
+Renting in London is awful. Listings are stale, every site asks the same questions, and nothing remembers what you actually care about. Rentry is a conversational rental agent that:
 
-1. Calls `github_stats` to orient — stars, language mix, topics.
-2. Pulls the README and any manifests it sees (`package.json`, `Cargo.toml`, `pyproject.toml`, etc.).
-3. Drills into specific files when the README points it somewhere interesting.
-4. **Picks an archetype** — the kind of product that best showcases this repo:
-   - `playground` — try-it-now UI for parsers, formatters, encoders, CLIs
-   - `explorer` — queryable browser for repos that ship structured data or specs
-   - `gallery` — submission + voting hub for visual / generative artifacts
-   - `docs_hub` — searchable docs site with per-page comments
-   - `landing` — fallback editorial page for pure-infra repos
-5. Drafts a structured **marketing brief** (audience, problem, value prop, features with evidence, hero copy, social proof) and a **Postgres schema** if the archetype needs persistence.
-6. Calls `commission_v0` exactly once as its terminal action — passing the brief to v0 to generate a full Next.js + Tailwind + Postgres app.
+1. Takes free-form criteria — *"Aldgate East, Waterloo, or near KCL. ~£2000 pcm. Easy commute to Camden."*
+2. Pulls **live listings** from Bright Data — actual properties on the market right now, not a stale index.
+3. Computes real commute times, applies budget filters, and **remembers what you said last time** — no ground floor, must have natural light, hates carpet — without you re-explaining.
+4. Returns three ranked properties, each with specific green-checkmark reasons it thinks they fit. The "remembered from last session" reason is the one that makes the room laugh.
 
-The browser sees every step as a streaming SSE event. The "agent trace" panel shows tool calls, arguments, durations, and final reasoning live.
+The agent that helped you last year still has your back when the rent goes up. That's the whole product.
 
-## Why this won't be a v0 wrapper
+## Why all three sponsors
 
-A v0 wrapper takes a prompt and forwards it. Productify's reasoning is in the *understanding* phase, not the *generation* phase:
+The product organically uses all three sponsor tools — each one does work that the demo can *see*, not buzzword name-drops:
 
-- **Archetype selection** is a real choice the agent makes from evidence. A regex library gets a playground; a CSS framework gets a gallery; an internal infra tool gets a landing page.
-- **Schema design** is non-trivial and grounded in what the archetype needs. Playground saves runs; gallery stores votes.
-- **The brief is verbatim, not a prompt template.** Hero copy, features, value props are filled by the agent from repo evidence. v0 receives a finished brief, not a prompt with placeholders.
+- **Vercel** — hosting, Postgres for per-username persistence, AI workflow + Server Actions running the agent loop, Fluid Compute for the streaming reasoning trace.
+- **Bright Data** — live property listings fetched on demand for the user's stated criteria. Counted on screen ("47 listings") so the contribution is visible.
+- **Mubit** — long-term memory of the user's preferences. Surfaces as a typographically-distinct *"remembered from last session"* line on the top result card.
 
-The result: every output uses v0's full-stack capability (DB + server actions + UI), not just landing-page generation.
+Pull any one out and the demo gets weaker. That's the test.
+
+## What makes it an agent
+
+It's not a search box with extra steps. The flow runs as a streaming reasoning trace — searching three areas in parallel, pulling listings, computing commutes, applying remembered preferences — rendered live, one line at a time. The user watches the agent *think*. Then three property cards land with explainable fit.
+
+On the second login, the trace changes:
+
+```
+Welcome back, shumeng.
+Loading 14 known preferences from Mubit…
+  • commute to Camden — must stay under 20 min
+  • no ground floor
+  • avoid: shared bathrooms
+Applying new budget: £2,200
+```
+
+Same agent, six months later, picking up where it left off. Persistence isn't a convenience feature — it's the product.
 
 ## Architecture
 
 ```
-                       ┌─────────────────────────────────┐
-   browser  ◀── SSE ───│ /api/generate  (Next.js Route)  │
-      │                └──────────────┬──────────────────┘
-      │                               │
-      │                       ┌───────▼───────┐
-      │                       │  agent loop   │   AI SDK 6 + streamText
-      │                       │  (lib/agent)  │   stopWhen: stepCountIs(14)
-      │                       └───────┬───────┘
-      │                               │
-      │      ┌──────────────────┬─────┴─────┬──────────────────┐
-      │      ▼                  ▼           ▼                  ▼
-      │  github_stats       fetch_readme   read_file       commission_v0
-      │  fetch_manifest     list_dir       search_code     (terminal)
-      │  ─────────┬─────────────────────┬─────              ─────┬────
-      │           │                     │                        │
-      │           ▼                     ▼                        ▼
-      │     GitHub REST API       GitHub Trees API           v0 SDK
+                     ┌──────────────────────────────────────┐
+   browser  ◀── SSE ─│ /api/search  (Next.js Route)         │
+      │              └──────────────────┬───────────────────┘
+      │                                 │
+      │                       ┌─────────▼─────────┐
+      │                       │   agent workflow  │
+      │                       │  (workflows/)     │
+      │                       └─────────┬─────────┘
+      │                                 │
+      │       ┌────────────────┬────────┴────────┬────────────────┐
+      │       ▼                ▼                 ▼                ▼
+      │  Bright Data       Mubit recall      commute calc    rank + explain
+      │  live listings     prefs by user     (transit API)   (reasons w/ evidence)
+      │       │                │
+      │       ▼                ▼
+      │  Vercel Postgres  ←────┘  per-username session state
       │
-      └─────────────────── thinking panel UI
+      └───────────── reasoning trace UI (typographically large, lined-out) ──
 ```
 
-Built with **AI SDK 6**, **Vercel AI Gateway** (Anthropic Claude Sonnet 4.5), the **v0 SDK**, **Next.js 16** (App Router + Turbopack), and **Bun**. The app itself is editorially designed; the generated apps inherit a matching aesthetic.
+Built with **Next.js 16** (App Router + Turbopack), **Bun** (runtime + workspace manager), **AI SDK** on **Vercel AI Gateway**, **Vercel Postgres**, **Bright Data** for live listings, and **Mubit** for cross-session preference memory. The interface is editorial dark — Geist sans, Instrument Serif italic accents, dark zinc surfaces, subtle grain — to feel like a product, not a demo.
 
 ## Repo layout
 
 ```
-apps/productify/         the hackathon entry — paste a repo, watch it ship
-  src/app/page.tsx       hero + form
-  src/app/api/generate   streaming Route Handler
-  src/lib/agent.ts       investigation loop driver
-  src/lib/tools.ts       agent's tool surface
-  src/lib/commission.ts  v0 terminal action
-  src/lib/github.ts      GitHub primitives the tools wrap
-  src/lib/schema.ts      shared zod / TS types
-apps/nextjs-explorer/    earlier, unrelated experiment
-crates/                  Rust workspace (unused by this entry)
+apps/rentry/                  the hackathon entry
+  src/app/page.tsx            auth → prompt → reasoning → results
+  src/app/api/search/         streaming Route Handler
+  src/workflows/search.ts     agent workflow driver
+  src/lib/brightdata.ts       Bright Data integration + cache fallback
+  src/lib/mubit.ts            preference recall + write-back
+  src/lib/schema.ts           shared zod / TS types
+apps/nextjs-explorer/         earlier experiment, kept as styling baseline
+apps/productify/              abandoned earlier submission, kept for reference
 ```
 
-See [`AGENTS.md`](./AGENTS.md) for monorepo conventions and [`docs/monorepo.md`](./docs/monorepo.md) for setup.
+See [`AGENTS.md`](./AGENTS.md) for monorepo conventions and [`PITCH.md`](./PITCH.md) for the full live-demo script.
 
 ## Run locally
 
 ```bash
 bun install
-cp apps/productify/.env.example apps/productify/.env.local
-# then edit .env.local — set AI_GATEWAY_API_KEY
-bun run dev:productify       # http://localhost:3001
+cp apps/rentry/.env.example apps/rentry/.env.local
+# then edit .env.local — BRIGHTDATA_API_KEY, MUBIT_API_KEY, POSTGRES_URL, AI_GATEWAY_API_KEY
+bun run dev:rentry       # http://localhost:3002
 ```
-
-The v0 API key is **not** an env var. You paste it into the UI; it travels with the request and is never persisted.
 
 ## Status
 
-Hackathon prototype. The agent loop and v0 commission are end-to-end working. Rate-limit fallback caching, Vercel deployment, and a recorded walkthrough are the remaining polish items.
+Hackathon prototype, end-to-end working. Auth → prompt → live Bright Data fetch → Mubit-augmented ranking → cross-session recall is the canonical demo path and it's unbroken. Rate-limit fallbacks, pre-warmed cache, and the on-stage live-invite load handling are described in [`PITCH.md`](./PITCH.md).

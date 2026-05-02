@@ -2,10 +2,13 @@
   "name": "zero-to-agent",
   "version": "0.1.0",
   "private": true,
-  "description": "Hackathon monorepo: Rust backend + Next.js frontend.",
+  "description": "Hackathon monorepo: TypeScript-only Next.js apps (nextjs-explorer, productify, rentry).",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "bun --filter nextjs-explorer dev",
+    "dev": "bun --filter rentry dev",
+    "dev:explorer": "bun --filter nextjs-explorer dev",
+    "dev:productify": "bun --filter productify dev",
+    "dev:rentry": "bun --filter rentry dev",
     "build": "bun --filter '*' build",
     "lint": "bun --filter '*' lint"
   },
