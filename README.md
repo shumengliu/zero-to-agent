@@ -25,11 +25,11 @@ The agent that helped you last year still has your back when the rent goes up. T
 
 ## Why all three sponsors
 
-The product organically uses all three sponsor tools — each one does work the demo can *see*, not buzzword name-drops:
+The product organically uses all three sponsor tools — each one does work the demo can *see*, not buzzword name-drops. Each owns a distinct verb so the roles never blur:
 
-- **Vercel** — hosting, Postgres for per-username persistence, AI workflow + Server Actions running the agent loop, Fluid Compute for the streaming reasoning trace.
-- **Bright Data** — live property listings fetched on demand for the user's stated criteria. Counted on screen ("84 listings") so the contribution is visible.
-- **Mubit** — long-term memory of the user's preferences. Surfaces as a typographically-distinct *"remembered from last session"* line on the top result card.
+- **Bright Data SEES** — live property listings fetched on demand for the user's stated criteria. Counted on screen ("84 listings") so the contribution is visible.
+- **Vercel Workflow RUNS** — hosting, Postgres for per-username persistence, AI workflow + Server Actions running the agent loop, Fluid Compute for the streaming reasoning trace.
+- **Mubit REMEMBERS** — long-term memory of the user's preferences. Surfaces as a typographically-distinct *"remembered from last session"* line on the top result card.
 
 Pull any one out and the demo gets weaker. That's the test.
 
