@@ -317,6 +317,12 @@ function Header({
           </span>
         </div>
         <div className="flex items-center gap-5 text-xs text-zinc-500 font-mono">
+          <a
+            href="/demo-finish"
+            className="px-2.5 py-1 rounded-md border border-white/[0.1] text-zinc-400 hover:text-white hover:border-white/[0.2] transition-colors"
+          >
+            finish demo →
+          </a>
           {username && (
             <>
               <span>
