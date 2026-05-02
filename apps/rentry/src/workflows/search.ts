@@ -48,7 +48,6 @@ export async function searchWorkflow(args: {
   //    across logout/login (Beat 6's "fresh workflow run" beat).
   const prefs = await loadAndIncrementRunStep(username);
   const runNumber = prefs.runCount;
-  const isReturn = prefs.lastSearches.length > 0 || prefs.dealBreakers.length > 0;
 
   await emit({
     kind: "started",
@@ -65,33 +64,45 @@ export async function searchWorkflow(args: {
     label: "Recalling memory",
   });
 
-  if (isReturn) {
-    const recalled = await recallFromMubitStep(username);
-    const items = buildRecallItems(prefs, recalled);
-    const recallCount = Math.max(items.length, prefs.lastSearches.length);
+  // Capture the user's request to Mubit *before* we recall, so even on a
+  // cold first turn the agent has at least the just-stated prompt to echo
+  // back. Without this, a brand-new user sees an empty recall block on
+  // turn 1 and only sees Mubit "kick in" from turn 2 onwards.
+  await ingestPromptToMubitStep({ username, prompt });
 
-    if (items.length > 0) {
-      await emit({
-        kind: "thinking",
-        style: "mubit_header",
-        text: `Mubit recall — ${recallCount} ${recallCount === 1 ? "preference" : "preferences"} for ${username}`,
-        emphasis: "bold",
-      });
-      await sleep(700);
+  const recalled = await recallFromMubitStep(username);
+  const items = buildRecallItems(prefs, recalled);
 
-      for (const item of items.slice(0, 5)) {
-        await emit({
-          kind: "thinking",
-          style: "mubit_item",
-          text: item.text,
-          indent: 1,
-          mubitSessionsAgo: item.sessionsAgo,
-        });
-        await sleep(220);
-      }
-      await sleep(500);
-    }
+  // Always lead with an in-session "noting your request" line so cold
+  // users see Mubit acknowledging this turn, and warm users see the
+  // current request tied to remembered facts.
+  const allItems: RecallItem[] = [
+    {
+      text: `noting this session: "${truncatePrompt(prompt, 48)}"`,
+      sessionsAgo: 0,
+    },
+    ...items,
+  ];
+
+  await emit({
+    kind: "thinking",
+    style: "mubit_header",
+    text: `Mubit — ${allItems.length} ${allItems.length === 1 ? "item" : "items"} for ${username}`,
+    emphasis: "bold",
+  });
+  await sleep(700);
+
+  for (const item of allItems.slice(0, 5)) {
+    await emit({
+      kind: "thinking",
+      style: "mubit_item",
+      text: item.text,
+      indent: 1,
+      mubitSessionsAgo: item.sessionsAgo,
+    });
+    await sleep(220);
   }
+  await sleep(500);
 
   // ---- Step 2: parse prompt ------------------------------------------------
   await emit({
@@ -211,6 +222,27 @@ async function loadAndIncrementRunStep(username: string): Promise<UserPrefs> {
   const next: UserPrefs = { ...prefs, runCount: (prefs.runCount ?? 0) + 1 };
   await setUserPrefs(username, next);
   return next;
+}
+
+async function ingestPromptToMubitStep(args: {
+  username: string;
+  prompt: string;
+}): Promise<void> {
+  "use step";
+  // Lightweight ingest of *just* the raw prompt before recall. The richer
+  // post-search ingest (with criteria + top result) still runs at the end of
+  // the workflow — this one exists so turn 1's recall has something to
+  // surface for users whose structured prefs are empty.
+  await mubitIngest({
+    runId: args.username,
+    items: [
+      {
+        id: `${args.username}:prompt:${Date.now()}`,
+        intent: "fact",
+        text: `${args.username} requested: "${args.prompt}"`,
+      },
+    ],
+  });
 }
 
 async function recallFromMubitStep(username: string): Promise<MubitEvidence[]> {
@@ -409,7 +441,10 @@ function extractCriteria(
     norm.match(
       /(?:around|under|below|max|ceiling|now|to)\s+(?:£)?\s*([0-9][0-9,\.]*)/,
     ) ||
-    norm.match(/([0-9][0-9,\.]*)\s*pcm/);
+    norm.match(/([0-9][0-9,\.]*)\s*pcm/) ||
+    norm.match(
+      /([0-9][0-9,\.]*)\s*(?:per\s*month|a\s*month|monthly|\/\s*month|\/\s*mo|p\/?m\b|p\.m\.|month\b)/,
+    );
   if (budgetMatch) {
     const cleaned = Number(budgetMatch[1].replace(/[,\.]/g, ""));
     if (Number.isFinite(cleaned) && cleaned > 100) budgetPcm = cleaned;
@@ -609,7 +644,13 @@ function rankAndPick(
       ? listings
       : listings.filter((l) => l.pricePcm <= criteria.budgetPcm!);
 
-  const scored = withinBudget
+  const matchesType = withinBudget.filter((l) => {
+    if (criteria.propertyType === "studio") return l.bedrooms === 0;
+    if (criteria.propertyType === "flat") return l.bedrooms >= 1;
+    return true;
+  });
+
+  const scored = matchesType
     .map((listing) => {
       let score = 0.5;
       const reasons: ResultReason[] = [];
