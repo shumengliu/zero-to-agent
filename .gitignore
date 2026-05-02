@@ -12,6 +12,7 @@ target/
 .turbo/
 .cache/
 .parcel-cache/
+*.tsbuildinfo
 
 # Env
 .env
