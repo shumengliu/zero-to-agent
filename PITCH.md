@@ -19,15 +19,40 @@ The deployed-URL flow and the on-stage demo flow are **the same flow** — don't
 - **Demo length:** ~105 seconds in full (90s demo + ~15s live invite at the end). Forward-vision is held for Q&A. 60-second cutdown defined below.
 - **The closing live invite ("$100 of Bright Data credits — pull out your phones") is the most ambitious bet in this script.** It's strong on both axes (room *and* judges, especially the Bright Data judge watching their dashboard light up) — but only if the app holds under live load. See "Load-handling requirements" in the build spec. If load-test fails, cut the invite and end on the sponsor recap.
 
+### Data strategy — hybrid, not binary
+
+**Mock the path that's already won. Live for the path that earns the win.**
+
+| Path | Strategy | Why |
+|---|---|---|
+| Scripted demo prompt (Aldgate East / Waterloo / KCL · £2000 · Camden) | **Pre-cached server-side**, returns instantly | Live data adds zero value here; failure undoes everything |
+| Top ~20 likely London prompts (popular postcodes + round budgets) | **Pre-warmed cache** | Stage-1 judges typing common queries hit cached real data |
+| Random / cache-miss prompts (Stage 1 judges, Beat 7 audience) | **Live Bright Data**, with curated-real-listings fallback on rate-limit | Sponsor signal *requires* real API usage; Bright Data judge can see their dashboard |
+
+Full-mock optimizes for an event you didn't reach (Stage 1 cuts you for a fake URL). Full-live takes risk for no reward on the scripted demo prompt. The hybrid wins all three judging surfaces: deployed URL, scripted demo, and live invite.
+
 ---
 
 ## Pre-stage setup
 
 - App pre-loaded on the auth screen, big monitor mirror confirmed.
+- **Demo persona is a returning user.** The scripted demo runs on a pre-seeded `shumeng` account with ~6 months of fake history — this is what makes Mubit's recall block fire and the rent-hike callback work. New-user demo is rejected because it deletes Mubit's primary visible artifact. Pre-seeded demo personas are industry-standard; no honesty issue.
 - **Mubit pre-seeded with one prior session for the demo username** (so the second-pass moment lands).
-- **Bright Data results pre-cached** for the canonical prompt (server-side fallback if API is slow — judges don't know).
+- **Bright Data results pre-cached** for the scripted prompt (server-side fallback if API is slow — judges don't know).
 - Pre-recorded screen capture queued on a phone. If anything dies, cut to it mid-sentence and keep talking.
 - Demo prompt copied to clipboard.
+
+### Two doors: scripted demo (returning user) vs. live invite (new users)
+
+These are different audiences and need different setups — same app, two doors:
+
+| Surface | Audience | User type | Mubit fires? |
+|---|---|---|---|
+| **Scripted demo (Beats 1–7)** | Stage judges, room | Returning user (`shumeng`, pre-seeded) | Yes — full recall + rent-hike callback |
+| **Live invite (Beat 7+)** | Audience on phones, Stage 1 deployed-URL judges | New users (their own usernames) | No — empty memory on first run |
+| **Optional** | Audience curious about the demo | Logs in as `shumeng` to replicate the on-stage experience | Yes |
+
+The first-time-user banner ("Log in as `shumeng` to see the personalized version from the demo") makes both doors discoverable from the same UI.
 
 ---
 
@@ -63,9 +88,11 @@ The deployed-URL flow and the on-stage demo flow are **the same flow** — don't
 >
 > *[paste prompt — single keystroke]*
 
-**Canonical demo prompt** (must be on clipboard, character-for-character):
+**Scripted demo prompt** — the literal text you paste from clipboard during this beat. The whole demo is engineered around this exact string; it must be on clipboard, character-for-character:
 
 > *"I want to live in Aldgate East, Waterloo, or near KCL. Budget around £2000 pcm. I need an easy commute to Camden."*
+
+(Distinct from the empty-input-box placeholder text, which should be a generic hint like *"e.g. studio in Hackney under £1500"* to guide first-time users on the deployed URL.)
 
 > "Hit go."
 >
@@ -217,6 +244,30 @@ Future-vision is **not in the demo.** The 90s ends on Beat 7's sponsor-recap kil
 - "How does this scale beyond one user?"
 - "Where does this go in 6 months?"
 - "How would you turn this into a real product?"
+- **"Where does your agent take real-world action?"** ← high-probability question, see dedicated answer below
+
+### Critical Q&A answer — the "real-world action" question
+
+Sponsors explicitly said they want agents that *take real-world actions that complete something otherwise annoying.* The current rentry demo stops at recommendations, not actions. **This question will get asked. Have the answer locked in.**
+
+> "Two-part answer.
+>
+> First — the agent already automates the action that takes a Londoner an entire Saturday: trawling Rightmove, normalizing budgets, calculating commute times, remembering what you cared about last time. We compressed six hours of manual work into thirty seconds. That's the action it takes today.
+>
+> Second — and this is what we're shipping next — the liaising agent. Calendar via MCP, email via MCP. Sunday at 11pm, three letting agents have replied — the agent reads them, slots viewings around your week, replies in your voice. That's the next agent in the roadmap. The architecture is ready for it; the demo just doesn't include it yet.
+>
+> One agent finds the flat. The next gets you in the door."
+
+**Why this answer works:**
+- **Reframes search-and-decide as itself an action.** Compressing 6 hours of human work into 30 seconds *is* completing something otherwise annoying — that meets the brief on a defensible reading, even if it's not transactional.
+- **Doesn't deflect.** Acknowledges the gap implicitly ("the demo just doesn't include it yet") instead of dodging.
+- **Bridges to the roadmap naturally.** Lets you deliver the multi-agent vision that was already prepped for Q&A — now it's the *answer*, not just future-vision.
+- **Specific MCP namedrops** signal architectural credibility to the dev judges.
+
+**Delivery rules:**
+- Don't sound defensive. The reframe ("it already takes the most painful action") has to land confident, not apologetic.
+- Don't volunteer "we ran out of time." Frame the liaising agent as *next on the roadmap*, not *missing from this build*.
+- This answer is ~30 seconds. Deliver it once, cleanly. Don't elaborate unless they push.
 
 ### The answer — multi-agent roadmap (deliver in ~25–35 seconds)
 
@@ -282,12 +333,12 @@ Memory is invisible by design — the demo must deliberately make it visible:
 - The "remembered from last session" checkmark must be **typographically distinct** (italic, lighter weight, or a small Mubit attribution badge).
 
 ### Backend behavior
-- Bright Data integration with **server-side cached fallback** for the canonical demo prompt. Failure of live API must not break the demo.
+- Bright Data integration with **server-side cached fallback** for the scripted demo prompt. Failure of live API must not break the demo.
 - Mubit pre-seeded with the demo username's prefs. The "no ground floor" preference must be retrievable and visibly applied to the top card.
 - Vercel Postgres (or equivalent) persistence so `(username) → (saved prefs, past sessions)` survives logout/login.
 
 ### Hardcoded fallbacks (do these — do not let live calls decide whether the demo lands)
-- The top result card's content for the canonical prompt should be a hardcoded fallback if scoring is flaky.
+- The top result card's content for the scripted prompt should be a hardcoded fallback if scoring is flaky.
 - The "remembered from last session" line on the top card must be hardcoded for the demo profile. **It is the Mubit money line.** Don't let it depend on a live call.
 - Have an offline-mode toggle for emergency.
 
@@ -309,7 +360,7 @@ The "100 people in the room" close only works if the deployed URL survives ~30+ 
 | If… | Do |
 |---|---|
 | Bright Data hangs > 8s | "While that loads — *[fill with one extra sentence about the problem]*". If still hanging at 12s, cut to pre-recorded video. |
-| Listings come back empty | Hardcoded fallback set keyed off the canonical prompt. Server-side. Judges never see it. |
+| Listings come back empty | Hardcoded fallback set keyed off the scripted prompt. Server-side. Judges never see it. |
 | Mubit recall fails | "*remembered from last session*" line on the top card is hardcoded for the demo profile. |
 | Wifi dies | Pre-recorded video on phone, HDMI in. |
 

@@ -53,6 +53,10 @@ export type UserPrefs = {
   preferredAreas: string[];
   lastSearches: Array<{ prompt: string; areas: string[]; at: string }>;
   seenListingIds: string[];
+  // Cumulative run counter, displayed in the step counter as `run #N`.
+  // Increments per search. Seeded high (e.g. 846) for the demo username so
+  // the first scripted demo run shows `run #847`.
+  runCount: number;
 };
 
 export type SearchCriteria = {
@@ -64,12 +68,22 @@ export type SearchCriteria = {
   rawPrompt: string;
 };
 
+// Compact summary of the previous turn's criteria + top result, passed back
+// into the next workflow run so a follow-up like "cheaper" / "smaller" /
+// "different area" can build on the prior turn instead of starting cold.
+export type ConversationContext = {
+  priorCriteria: SearchCriteria;
+  priorTopTitle: string | null;
+  priorTopPricePcm: number | null;
+};
+
 // One reason in a result card. `remembered: true` means this reason came from
-// the user's saved Mubit prefs, not from the current prompt — typographically
-// distinct in the UI (italic + attribution).
+// the user's saved Mubit prefs, not from the current prompt. Rendered with a
+// `Mubit · N sessions ago` attribution pill in the UI.
 export type ResultReason = {
   text: string;
   remembered?: boolean;
+  mubitSessionsAgo?: number;
 };
 
 export type ResultCard = {
@@ -85,10 +99,26 @@ export type ResultCard = {
 };
 
 // Streamed events emitted by the search workflow. The UI consumes ndjson and
-// reduces these into UI state.
+// reduces these into UI state. Three visible-artifact zones, one per sponsor:
+//   - "step" → Vercel Workflow step counter (top-left, advances live)
+//   - "thinking" with style: "mubit_header"/"mubit_item" → Mubit recall block
+//   - everything else → Bright Data fetch lines (centre)
 export type SearchEvent =
-  | { kind: "started"; runId: string; username: string }
-  | { kind: "thinking"; text: string; indent?: number; emphasis?: "bold" | "muted" }
+  | { kind: "started"; runId: string; username: string; runNumber: number }
+  | {
+      kind: "step";
+      current: number;
+      total: number;
+      label: string;
+    }
+  | {
+      kind: "thinking";
+      text: string;
+      indent?: number;
+      emphasis?: "bold" | "muted";
+      style?: "default" | "mubit_header" | "mubit_item";
+      mubitSessionsAgo?: number;
+    }
   | { kind: "criteria_extracted"; criteria: SearchCriteria }
   | { kind: "results"; cards: ResultCard[] }
   | { kind: "complete" }

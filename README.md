@@ -6,8 +6,9 @@ Submission for [Zero to Agent](https://oscarama.notion.site/Zero-to-Agent-London
 
 > **Live demo:** **[rentry-zero-to-agent.vercel.app](https://rentry-zero-to-agent.vercel.app)**
 >
-> **Try it:** Pick any username → describe what you want in plain English → watch the agent reason through live listings.
-> Log in again later as the same name and your preferences come back with you.
+> Pick any username, describe what you want in plain English, and watch the agent reason through live listings. Log in again later as the same name and your preferences come back with you.
+
+![Rentry landing page — "Find a flat the way a friend with insider knowledge would."](docs/marketing/03-landing-hero.png)
 
 ---
 
@@ -18,36 +19,35 @@ Renting in London is awful. Listings are stale, every site asks the same questio
 1. Takes free-form criteria — *"Aldgate East, Waterloo, or near KCL. ~£2000 pcm. Easy commute to Camden."*
 2. Pulls **live listings** from Bright Data — actual properties on the market right now, not a stale index.
 3. Computes real commute times, applies budget filters, and **remembers what you said last time** — no ground floor, must have natural light, hates carpet — without you re-explaining.
-4. Returns three ranked properties, each with specific green-checkmark reasons it thinks they fit. The "remembered from last session" reason is the one that makes the room laugh.
+4. Returns three ranked properties, each with specific green-checkmark reasons it thinks they fit. The "remembered from last session" line on the top card is the one that makes the room laugh.
 
 The agent that helped you last year still has your back when the rent goes up. That's the whole product.
 
 ## Why all three sponsors
 
-The product organically uses all three sponsor tools — each one does work that the demo can *see*, not buzzword name-drops:
+The product organically uses all three sponsor tools — each one does work the demo can *see*, not buzzword name-drops:
 
 - **Vercel** — hosting, Postgres for per-username persistence, AI workflow + Server Actions running the agent loop, Fluid Compute for the streaming reasoning trace.
-- **Bright Data** — live property listings fetched on demand for the user's stated criteria. Counted on screen ("47 listings") so the contribution is visible.
+- **Bright Data** — live property listings fetched on demand for the user's stated criteria. Counted on screen ("84 listings") so the contribution is visible.
 - **Mubit** — long-term memory of the user's preferences. Surfaces as a typographically-distinct *"remembered from last session"* line on the top result card.
 
 Pull any one out and the demo gets weaker. That's the test.
 
 ## What makes it an agent
 
-It's not a search box with extra steps. The flow runs as a streaming reasoning trace — searching three areas in parallel, pulling listings, computing commutes, applying remembered preferences — rendered live, one line at a time. The user watches the agent *think*. Then three property cards land with explainable fit.
+It's not a search box with extra steps. The flow runs as a streaming reasoning trace — searching three areas in parallel, pulling listings, computing commutes, applying remembered preferences — rendered live, one line at a time. The user watches the agent *think*.
 
-On the second login, the trace changes:
+<p align="center">
+  <img src="docs/marketing/01-mubit-recall.png" alt="Streaming reasoning trace — Mubit recalls 9 preferences for the returning user, then searches 2 areas in parallel, pulls 84 live listings via Bright Data, and applies budget and commute filters." width="520">
+</p>
 
-```
-Welcome back, shumeng.
-Loading 14 known preferences from Mubit…
-  • commute to Camden — must stay under 20 min
-  • no ground floor
-  • avoid: shared bathrooms
-Applying new budget: £2,200
-```
+On the second login, the trace changes. Mubit pulls the prior session's preferences — *avoid above takeaway*, *prefers natural light*, *no ground floor* — each tagged with how long ago it was learned. Same agent, six months later, picking up where it left off. Persistence isn't a convenience feature; it's the product.
 
-Same agent, six months later, picking up where it left off. Persistence isn't a convenience feature — it's the product.
+Then three property cards land with explainable fit:
+
+![Top 3 ranked results, each with green-checkmark reasons including budget delta, no ground floor, Zone 1, and a Mubit "remembered from last session" tag](docs/marketing/02-top-3-results.png)
+
+Every reason on every card is grounded — the budget delta, the zone, the floor — and the violet *Mubit* badges are the ones that prove the agent remembers you.
 
 ## Architecture
 

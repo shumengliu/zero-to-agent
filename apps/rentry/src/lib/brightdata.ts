@@ -77,8 +77,9 @@ export async function fetchListings(
     return real.slice(0, input.limit ?? 20);
   }
 
-  // Soft fallback — top up with fixtures so the trace's listing count and the
-  // scoring layer always have something to chew on.
+  // Soft fallback. Only top up with fixtures when their prices actually fit
+  // the budget — otherwise we'd inject central-London £1,800 fixtures into a
+  // £1,000 search and the downstream filter would drop them all anyway.
   const fallback = mockListings(input, sources);
   const merged = dedupe([...real, ...fallback]);
   return merged.slice(0, input.limit ?? 20);
@@ -100,6 +101,13 @@ async function fetchOneSource(args: {
 
 // --- RightMove ---------------------------------------------------------------
 
+// Number of result pages to fetch per area in parallel. RightMove paginates
+// at 24 per page, so PAGES_PER_AREA × 24 is the upper bound on listings per
+// area. 3 pages × 3 areas (canonical demo) ≈ ~150-225 listings — that's the
+// "real London market sweep" feel the trace should convey.
+const PAGES_PER_AREA = Number(process.env.RM_PAGES_PER_AREA ?? 3);
+const RM_PAGE_SIZE = 24;
+
 async function fetchRightmove(
   input: FetchListingsInput,
   apiKey: string,
@@ -107,21 +115,44 @@ async function fetchRightmove(
   const outcode = lookupOutcode(input.area);
   if (!outcode) return [];
 
-  const cacheKey = `rm-${outcode}-${input.budgetPcm ?? "any"}-${input.bedroomsMin}`;
+  const cacheKey = `rm-${outcode}-${input.budgetPcm ?? "any"}-${input.bedroomsMin}-p${PAGES_PER_AREA}`;
   const cached = await readCache(cacheKey);
   if (cached) return cached;
 
-  const params = new URLSearchParams();
-  if (input.budgetPcm) params.set("maxPrice", String(input.budgetPcm));
-  if (input.bedroomsMin > 0) params.set("minBedrooms", String(input.bedroomsMin));
-  const targetUrl = `https://www.rightmove.co.uk/property-to-rent/${outcode}.html${params.size ? "?" + params.toString() : ""}`;
+  const baseParams = new URLSearchParams();
+  if (input.budgetPcm) baseParams.set("maxPrice", String(input.budgetPcm));
+  if (input.bedroomsMin > 0)
+    baseParams.set("minBedrooms", String(input.bedroomsMin));
 
-  const html = await fetchViaUnlocker({ targetUrl, apiKey });
-  if (!html) return [];
+  // Fire all pages in parallel — total wall-clock cost is just the slowest
+  // page, not their sum. BD Unlocker handles bot bypass per request.
+  const pageUrls = Array.from({ length: PAGES_PER_AREA }, (_, i) => {
+    const params = new URLSearchParams(baseParams);
+    if (i > 0) params.set("index", String(i * RM_PAGE_SIZE));
+    return `https://www.rightmove.co.uk/property-to-rent/${outcode}.html${params.size ? "?" + params.toString() : ""}`;
+  });
 
-  const listings = parseRightmoveHtml(html, outcode);
-  if (listings.length > 0) await writeCache(cacheKey, listings);
-  return listings;
+  const htmls = await Promise.all(
+    pageUrls.map((targetUrl) => fetchViaUnlocker({ targetUrl, apiKey })),
+  );
+  const collected: Listing[] = [];
+  for (const html of htmls) {
+    if (!html) continue;
+    collected.push(...parseRightmoveHtml(html, outcode));
+  }
+
+  const deduped = dedupeByListingId(collected);
+  if (deduped.length > 0) await writeCache(cacheKey, deduped);
+  return deduped;
+}
+
+function dedupeByListingId(listings: Listing[]): Listing[] {
+  const seen = new Set<string>();
+  return listings.filter((l) => {
+    if (seen.has(l.id)) return false;
+    seen.add(l.id);
+    return true;
+  });
 }
 
 async function fetchViaUnlocker(args: {
@@ -397,11 +428,9 @@ function mockListings(
   const areaNeedle = input.area.toLowerCase();
   const matches = MOCK_LISTINGS.filter((l) => {
     if (!sources.includes(l.source)) return false;
-    if (
-      input.budgetPcm != null &&
-      l.pricePcm > input.budgetPcm + 200 // small grace so "under budget" reasons can show
-    )
-      return false;
+    // Strict budget filter — no grace. The downstream rankAndPick also enforces
+    // this, but doing it at the source keeps the trace's listing count honest.
+    if (input.budgetPcm != null && l.pricePcm > input.budgetPcm) return false;
     return matchesArea(l, areaNeedle);
   });
   return matches.slice(0, input.limit ?? 12);

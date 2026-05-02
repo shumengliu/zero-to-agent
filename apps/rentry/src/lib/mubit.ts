@@ -129,6 +129,7 @@ function blankPrefs(username: string): UserPrefs {
     preferredAreas: [],
     lastSearches: [],
     seenListingIds: [],
+    runCount: 0,
   };
 }
 
@@ -250,6 +251,7 @@ const SEED_PREFS_BY_USERNAME: Record<string, UserPrefs> = {
       },
     ],
     seenListingIds: [],
+    runCount: 846, // first search will display as `run #847` on stage
   },
   demo: {
     username: "demo",
@@ -262,5 +264,6 @@ const SEED_PREFS_BY_USERNAME: Record<string, UserPrefs> = {
     preferredAreas: ["Aldgate East", "Waterloo", "King's Cross"],
     lastSearches: [],
     seenListingIds: [],
+    runCount: 0,
   },
 };
