@@ -4,7 +4,7 @@
 
 Submission for [Zero to Agent](https://oscarama.notion.site/Zero-to-Agent-London-Information-Public-352f4900574780849517e736e27499b9), London.
 
-> **Live demo:** _(deployed URL pending — Vercel link being wired)_
+> **Live demo:** **[productify-delta.vercel.app](https://productify-delta.vercel.app)**
 >
 > **To try it yourself:** Paste your v0 API key + any GitHub repo. Watch the agent work in real time.
 
